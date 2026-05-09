@@ -1,0 +1,7 @@
+node_modules/
+.env
+session/
+*.log
+
+# Keep session directory tracked (empty) but not its contents
+!session/.gitkeep

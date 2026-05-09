@@ -1,0 +1,89 @@
+name: SVCN Daily Bill Reminders
+
+on:
+  schedule:
+    # 9AM Bangladesh Time = 3AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch: # allow manual trigger
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore WhatsApp session
+        uses: actions/cache@v4
+        with:
+          path: session/
+          key: whatsapp-session-${{ runner.os }}
+          restore-keys: whatsapp-session-
+
+      - name: Send bill reminders (due tomorrow)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          OWNER_PHONE: ${{ secrets.OWNER_PHONE }}
+          DELAY_MIN_MS: 30000
+          DELAY_MAX_MS: 90000
+        run: node src/jobs/sendReminders.js
+
+      - name: Save WhatsApp session
+        uses: actions/cache@v4
+        if: always()
+        with:
+          path: session/
+          key: whatsapp-session-${{ runner.os }}
+
+  send-overdue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: send-reminders # run after reminders
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore WhatsApp session
+        uses: actions/cache@v4
+        with:
+          path: session/
+          key: whatsapp-session-${{ runner.os }}
+          restore-keys: whatsapp-session-
+
+      - name: Send overdue bill alerts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          OWNER_PHONE: ${{ secrets.OWNER_PHONE }}
+          DELAY_MIN_MS: 30000
+          DELAY_MAX_MS: 90000
+        run: node src/jobs/sendOverdue.js
+
+      - name: Save WhatsApp session
+        uses: actions/cache@v4
+        if: always()
+        with:
+          path: session/
+          key: whatsapp-session-${{ runner.os }}

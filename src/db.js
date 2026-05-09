@@ -1,9 +1,10 @@
 require('dotenv').config();
-const { createClient } = require('@supabase/supabase-js');
+const { createClient } = require('@supabase/supabase-js');`nconst ws = require('ws');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  process.env.SUPABASE_SERVICE_KEY,
+  { realtime: { transport: require('ws') } }
 );
 
 // ─── Schema reference (from svcn-tracker Supabase) ───────────────────────────

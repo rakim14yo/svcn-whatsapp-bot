@@ -32,7 +32,7 @@ async function getBillsDueTomorrow() {
       due_date,
       status,
       notes,
-      customers!bills_customer_id_fkey (
+      customers (
         id,
         customer_id,
         name,

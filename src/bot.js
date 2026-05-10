@@ -6,12 +6,13 @@ const {
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
 } = require('@whiskeysockets/baileys');
+const qrcode = require('qrcode-terminal');
 const pino = require('pino');
 const path = require('path');
 const { handleMessage } = require('./handlers/messageHandler');
 
 const SESSION_DIR = path.join(__dirname, '..', 'session');
-const logger = pino({ level: 'silent' }); // suppress Baileys noise
+const logger = pino({ level: 'silent' });
 
 let sock = null;
 
@@ -26,48 +27,54 @@ async function createBot() {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, logger),
     },
-    printQRInTerminal: true,
+    printQRInTerminal: false,
     browser: ['SVCN Bot', 'Chrome', '120.0.0'],
     syncFullHistory: false,
-    markOnlineOnConnect: false, // less detectable
+    markOnlineOnConnect: false,
   });
 
-  // Save credentials whenever updated
   sock.ev.on('creds.update', saveCreds);
 
-  // Connection state handler
-  sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
+  sock.ev.on('connection.update', function(update) {
+    var connection = update.connection;
+    var lastDisconnect = update.lastDisconnect;
+    var qr = update.qr;
+
     if (qr) {
-      console.log('\n📱 Scan the QR code above with your WhatsApp bot number\n');
+      console.log('\n========= SCAN THIS QR CODE =========');
+      qrcode.generate(qr, { small: true });
+      console.log('=====================================\n');
     }
 
     if (connection === 'close') {
-      const code = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect = code !== DisconnectReason.loggedOut;
+      var code = lastDisconnect && lastDisconnect.error && lastDisconnect.error.output ? lastDisconnect.error.output.statusCode : 0;
+      var shouldReconnect = code !== DisconnectReason.loggedOut;
 
-      console.log(`❌ Connection closed (code ${code}). Reconnect: ${shouldReconnect}`);
+      console.log('Connection closed, code: ' + code + ', reconnect: ' + shouldReconnect);
 
       if (shouldReconnect) {
-        console.log('🔄 Reconnecting in 5 seconds...');
+        console.log('Reconnecting in 5 seconds...');
         setTimeout(createBot, 5000);
       } else {
-        console.log('🚫 Logged out. Delete session folder and restart to re-scan QR.');
+        console.log('Logged out. Delete session folder and restart.');
         process.exit(1);
       }
     }
 
     if (connection === 'open') {
-      console.log('✅ SVCN Bot connected to WhatsApp!');
+      console.log('SVCN Bot connected to WhatsApp!');
     }
   });
 
-  // Message handler
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+  sock.ev.on('messages.upsert', async function(update) {
+    var messages = update.messages;
+    var type = update.type;
     if (type !== 'notify') return;
 
-    for (const msg of messages) {
+    for (var i = 0; i < messages.length; i++) {
+      var msg = messages[i];
       if (!msg.message) continue;
-      if (msg.key.fromMe) continue; // ignore own messages
+      if (msg.key.fromMe) continue;
 
       try {
         await handleMessage(sock, msg);
